@@ -25,16 +25,20 @@ jobs:
           pip install -r MLProject/requirements.txt || true
           pip install mlflow tensorflow scikit-learn pandas
 
-      - name: Run training script
+      # - name: Run training script
+      #   run: |
+      #     cd MLProject
+      #     python modelling.py \
+      #       --epochs 10 \
+      #       --batch_size 32 \
+      #       --learning_rate 0.001 \
+      #       --n_hidden 2 \
+      #       --n_units 64 \
+      #       --dropout_rate 0.3
+
+      - name: Run mlflow project
         run: |
-          cd MLProject
-          python modelling.py \
-            --epochs 10 \
-            --batch_size 32 \
-            --learning_rate 0.001 \
-            --n_hidden 2 \
-            --n_units 64 \
-            --dropout_rate 0.3
+          mlflow run MLProject --env-manager=local
       
       - name: Get latest MLflow run_id
         run: |
