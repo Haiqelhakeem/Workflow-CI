@@ -18,7 +18,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 class MlflowMetricLogger(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         if logs:
-            # Prefixing with 'epoch_' to distinguish from final, overall metrics
             mlflow.log_metric("epoch_loss", logs.get('loss'), step=epoch)
             mlflow.log_metric("epoch_accuracy", logs.get('accuracy'), step=epoch)
             mlflow.log_metric("epoch_val_loss", logs.get('val_loss'), step=epoch)
@@ -30,18 +29,14 @@ def build_model(input_dim, n_hidden, n_units, dropout_rate, learning_rate):
     for _ in range(n_hidden):
         model.add(Dense(n_units, activation='relu', kernel_initializer='he_normal'))
         model.add(Dropout(dropout_rate))
-    model.add(Dense(1, activation='sigmoid')) # Sigmoid for binary classification
-
+    model.add(Dense(1, activation='sigmoid'))
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer,
-                  loss='binary_crossentropy',
-                  metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
 def evaluate_model(model, X_test, y_test):
     y_pred_proba = model.predict(X_test)
     y_pred = (y_pred_proba > 0.5).astype("int32")
-
     metrics = {
         "test_accuracy": accuracy_score(y_test, y_pred),
         "test_precision": precision_score(y_test, y_pred),
@@ -51,83 +46,92 @@ def evaluate_model(model, X_test, y_test):
     }
     return metrics
 
-def main(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
-    # Set the experiment name. If it doesn't exist, MLflow creates it.
-    mlflow.set_experiment("Churn Prediction DL")
+def run_training_logic(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
+    print("Logging parameters...")
+    mlflow.log_param("epochs", epochs)
+    mlflow.log_param("batch_size", batch_size)
+    mlflow.log_param("learning_rate", learning_rate)
+    mlflow.log_param("n_hidden_layers", n_hidden)
+    mlflow.log_param("n_units_per_layer", n_units)
+    mlflow.log_param("dropout_rate", dropout_rate)
+
+    # --- 2. Load and Prepare Data ---
+    print("Loading and preparing data...")
+    try:
+        # Assuming the MLProject file structure places data correctly
+        df = pd.read_csv('telco_preprocessed.csv')
+    except FileNotFoundError:
+        print("Error: 'telco_preprocessed.csv' not found.")
+        return
+
+    X = df.iloc[:, :-1]
+    y = df.iloc[:, -1]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
     
-    # Start an MLflow run. All subsequent logging will be associated with this run.
-    with mlflow.start_run() as run:
-        print(f"Starting MLflow Run: {run.info.run_id}")
+    mlflow.set_tag("scaler", "StandardScaler")
+    mlflow.log_param("training_samples", len(X_train_scaled))
+    mlflow.log_param("testing_samples", len(X_test_scaled))
 
-        # --- 1. Log Hyperparameters ---
-        print("Logging parameters...")
-        mlflow.log_param("epochs", epochs)
-        mlflow.log_param("batch_size", batch_size)
-        mlflow.log_param("learning_rate", learning_rate)
-        mlflow.log_param("n_hidden_layers", n_hidden)
-        mlflow.log_param("n_units_per_layer", n_units)
-        mlflow.log_param("dropout_rate", dropout_rate)
+    # --- 3. Build Model ---
+    print("Building the model...")
+    model = build_model(X_train_scaled.shape[1], n_hidden, n_units, dropout_rate, learning_rate)
 
-        # --- 2. Load and Prepare Data ---
-        print("Loading and preparing data...")
-        try:
-            df = pd.read_csv('telco_preprocessed.csv')
-        except FileNotFoundError:
-            print("Error: 'telco_preprocessed.csv' not found. Please ensure the file is in the same directory.")
-            return
+    # Log model summary as a text artifact
+    summary_list = []
+    model.summary(print_fn=lambda x: summary_list.append(x))
+    summary_str = "\n".join(summary_list)
+    mlflow.log_text(summary_str, "model_summary.txt")
 
-        X = df.iloc[:, :-1]
-        y = df.iloc[:, -1]
+    # --- 4. Train Model ---
+    print("Training the model...")
+    early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True, verbose=1)
+    mlflow_logger = MlflowMetricLogger()
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    model.fit(
+        X_train_scaled, y_train,
+        validation_split=0.2,
+        epochs=epochs,
+        batch_size=batch_size,
+        callbacks=[early_stopping, mlflow_logger],
+        verbose=2
+    )
+    mlflow.log_param("stopped_epoch", early_stopping.stopped_epoch if early_stopping.stopped_epoch > 0 else epochs)
 
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
-        
-        mlflow.set_tag("scaler", "StandardScaler")
-        mlflow.log_param("training_samples", len(X_train))
-        mlflow.log_param("testing_samples", len(X_test))
+    # --- 5. Evaluate and Log ---
+    print("Evaluating the model and logging final metrics...")
+    metrics = evaluate_model(model, X_test_scaled, y_test)
+    mlflow.log_metrics(metrics)
+    print("\nTest Metrics:", metrics)
 
-        print("Building the model...")
-        model = build_model(X_train.shape[1], n_hidden, n_units, dropout_rate, learning_rate)
+    # --- 6. Log Model ---
+    print("Logging the Keras model...")
+    mlflow.keras.log_model(
+        model, 
+        "keras-model", 
+        registered_model_name="deep-churn-predictor"
+    )
 
-        summary_list = []
-        model.summary(print_fn=lambda x: summary_list.append(x))
-        summary_str = "\n".join(summary_list)
-        mlflow.log_text(summary_str, "model_summary.txt")
+def main(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
+    mlflow.set_experiment("Churn Prediction DL")
 
-        print("Training the model...")
-        early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
-        mlflow_logger = MlflowMetricLogger()
+    # This logic prevents the MlflowException. It checks if a run is already
+    # active. If not, it creates one. Otherwise, it uses the existing run.
+    if mlflow.active_run() is None:
+        # Case 1: Script is run directly (e.g., `python modelling.py`)
+        print("No active MLflow run detected. Creating a new run.")
+        with mlflow.start_run(run_name="DL_Manual_Run") as run:
+            print(f"Started new run: {run.info.run_id}")
+            run_training_logic(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate)
+    else:
+        # Case 2: Script is run via `mlflow run` (e.g., in GitHub Actions)
+        print("Detected an existing MLflow run. Using it.")
+        run_training_logic(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate)
 
-        model.fit(
-            X_train, y_train,
-            validation_split=0.2,
-            epochs=epochs,
-            batch_size=batch_size,
-            callbacks=[early_stopping, mlflow_logger],
-            verbose=2
-        )
-        mlflow.log_param("stopped_epoch", early_stopping.stopped_epoch if early_stopping.stopped_epoch > 0 else epochs)
-
-        print("Evaluating the model and logging final metrics...")
-        metrics = evaluate_model(model, X_test, y_test)
-        mlflow.log_metrics(metrics)
-
-        print("\nTest Metrics:")
-        for name, value in metrics.items():
-            print(f"  {name}: {value:.4f}")
-
-        print("Logging the Keras model...")
-        mlflow.keras.log_model(
-            model, 
-            "keras-model", 
-            registered_model_name="deep-churn-predictor"
-        )
-
-        print("\nMLflow Run completed successfully.")
-        print(f"To see your run, type 'mlflow ui' in your terminal and open the MLflow UI.")
+    print("\nMLflow Run completed successfully.")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a Deep Learning model for Churn Prediction with MLflow tracking.')
