@@ -1,50 +1,37 @@
-name: MLflow CI Pipeline
+name: Train Deep Learning Model
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  mlflow-train:
+  train-model:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up job
-        run: echo "Starting MLflow training job..."
-
-      - name: Run actions/checkout@v3
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python 3.12.7
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12.7'
-
-      - name: Check Env
-        run: |
-          python --version
-          pip --version
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install mlflow
+          python -m pip install --upgrade pip
+          pip install -r MLProject/requirements.txt || true
+          pip install mlflow tensorflow scikit-learn pandas
 
-      - name: Run mlflow project
+      - name: Run training script
         run: |
           cd MLProject
-          mlflow run . \
-            -P epochs=10 \
-            -P batch_size=32 \
-            -P learning_rate=0.001 \
-            -P n_hidden=2 \
-            -P n_units=64 \
-            -P dropout_rate=0.3
-
-      - name: Get latest MLflow run_id
-        run: |
-          echo "Getting latest MLflow run ID..."
-          cd MLProject
-          latest_run=$(ls -td mlruns/0/* | head -1 | xargs basename)
-          echo "Latest run ID: $latest_run"
+          python modelling.py \
+            --epochs 10 \
+            --batch_size 32 \
+            --learning_rate 0.001 \
+            --n_hidden 2 \
+            --n_units 64 \
+            --dropout_rate 0.3
