@@ -38,5 +38,6 @@ jobs:
 
       - name: Get MLflow Run ID
         run: |
-          echo "MLflow Run ID: ${{ steps.training.outputs.mlflow_run_id }}"
+          run_id=$(echo "$mlflow_output" | grep "MLFLOW_RUN_ID:" | cut -d':' -f2)
+          echo "MLFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
 
