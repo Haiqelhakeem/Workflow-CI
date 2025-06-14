@@ -37,10 +37,8 @@ jobs:
             --dropout_rate 0.3
       
       - name: Get latest MLflow run_id
-        id: get_run_id
         run: |
-          cd MLProject
-          latest_run_id=$(find mlruns/0 -mindepth 1 -maxdepth 1 -type d | xargs -d '\n' stat --format '%Y :%n' | sort -nr | head -1 | cut -d: -f2 | xargs basename)
-          echo "Latest MLflow run ID: $latest_run_id"
-          echo "run_id=$latest_run_id" >> $GITHUB_OUTPUT
+          RUN_ID=$(ls -td mlruns/0/*/ | head -n 1 | cut -d'/' -f3)
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Latest run_id: $RUN_ID"
 
