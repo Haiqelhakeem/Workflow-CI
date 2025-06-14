@@ -36,10 +36,31 @@ jobs:
       #       --n_units 64 \
       #       --dropout_rate 0.3
 
+      # - name: Run mlflow project
+      #   run: |
+      #     mlflow run MLProject --env-manager=local
+
       - name: Run mlflow project
+        id: run_mlflow
         run: |
-          cd MLProject
-          mlflow run MLProject --env-manager=local
+          echo "Running MLflow project..."
+          mlflow_output=$(mlflow run MLProject --env-manager=local -P epochs=10 -P batch_size=32 -P learning_rate=0.001 -P n_hidden=2 -P n_units=64 -P dropout_rate=0.3)
+
+          echo "$mlflow_output"
+
+          # Extract run_id from the MLflow CLI output
+          run_id=$(echo "$mlflow_output" | grep -oP "(?<=Run (with )?ID )[a-f0-9]{32}")
+          
+          if [ -z "$run_id" ]; then
+            echo "❌ Failed to extract run_id"
+            exit 1
+          fi
+
+          echo "✅ MLflow run_id: $run_id"
+
+          # Export run_id as GitHub Actions env var for use in later steps
+          echo "MLFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
+
       
       - name: Get latest MLflow run_id
         run: |
