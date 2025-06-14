@@ -71,7 +71,7 @@ def main(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
         # --- 2. Load and Prepare Data ---
         print("Loading and preparing data...")
         try:
-            df = pd.read_csv('membangun_model_sml/telco_preprocessed.csv')
+            df = pd.read_csv('telco_preprocessed.csv')
         except FileNotFoundError:
             print("Error: 'telco_preprocessed.csv' not found. Please ensure the file is in the same directory.")
             return
