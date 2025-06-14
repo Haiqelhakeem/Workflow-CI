@@ -1,4 +1,4 @@
-name: Run MLflow Model Training
+name: Train Deep Learning Model
 
 on:
   push:
@@ -11,27 +11,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          auto-update-conda: true
-          python-version: 3.12
-          activate-environment: base
+          python-version: '3.12'
 
-      - name: Install MLflow
+      - name: Install dependencies
         run: |
-          pip install mlflow
+          python -m pip install --upgrade pip
+          pip install -r MLProject/requirements.txt || true
+          pip install mlflow tensorflow scikit-learn pandas
 
-      - name: Run MLflow project
+      - name: Run training script
         run: |
           cd MLProject
-          mlflow run . \
-            -P epochs=10 \
-            -P batch_size=32 \
-            -P learning_rate=0.001 \
-            -P n_hidden=2 \
-            -P n_units=64 \
-            -P dropout_rate=0.3
+          python modelling.py \
+            --epochs 10 \
+            --batch_size 32 \
+            --learning_rate 0.001 \
+            --n_hidden 2 \
+            --n_units 64 \
+            --dropout_rate 0.3
