@@ -1,79 +1,44 @@
-# A descriptive name for your GitHub Actions workflow
-name: Train Model with MLflow
+name: Train Deep Learning Model
 
-# --- Triggers ---
-# This workflow runs automatically on pushes to the 'main' branch
-# and can also be triggered manually from the GitHub Actions UI.
 on:
   push:
     branches:
       - main
   workflow_dispatch:
 
-# --- Jobs ---
-# Defines a single job named 'train-model' that will execute the steps.
 jobs:
   train-model:
-    # Specifies the runner environment. 'ubuntu-latest' is a standard choice.
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Check out the repository's code
-      # This action allows the workflow to access your repository files.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # Step 2: Set up the Python environment
-      # Installs a specific version of Python for the job.
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.12'
 
-      # Step 3: Install required Python dependencies
-      # Installs MLflow and other necessary libraries for your training script.
-      # For larger projects, using a requirements.txt file is recommended.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install -r MLProject/requirements.txt || true
           pip install mlflow tensorflow scikit-learn pandas
 
-      # Step 4: Run the MLflow Project and Capture the Run ID
-      # This is the core step for training.
-      # It executes your training script via 'mlflow run' and then
-      # captures the specific run_id output by the script.
-      - name: Run MLflow Project and Capture Run ID
-        id: run_mlflow # An ID to reference this step's outputs later
+      - name: Run training script
         run: |
-          echo "Running MLflow project..."
-          # The 'mlflow run .' command assumes your MLProject file is in the root.
-          # We capture its entire multiline output into a variable.
-          mlflow_output=$(mlflow run . -P epochs=10 -P batch_size=32 -P learning_rate=0.001 -P n_hidden=2 -P n_units=64 -P dropout_rate=0.3)
-          
-          # Echo the full output for debugging purposes in the Actions log.
-          echo "$mlflow_output"
+          cd MLProject
+          python modelling.py \
+            --epochs 10 \
+            --batch_size 32 \
+            --learning_rate 0.001 \
+            --n_hidden 2 \
+            --n_units 64 \
+            --dropout_rate 0.3
 
-          # Reliably parse the run ID from our script's specific output line.
-          # It looks for the line "MLFLOW_RUN_ID:..." and cuts the part after the colon.
-          run_id=$(echo "$mlflow_output" | grep "MLFLOW_RUN_ID:" | cut -d':' -f2)
-          
-          # Error handling: If the run_id was not found, fail the workflow.
-          if [ -z "$run_id" ]; then
-            echo "::error::Failed to extract run_id from script output."
-            exit 1
-          fi
-
-          echo "✅ Successfully captured MLflow run_id: $run_id"
-
-          # Make the run_id available to all subsequent steps in this job
-          # by appending it to the GITHUB_ENV file.
-          echo "MLFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
-
-      # Step 5: A demonstration step to show the run_id was captured
-      # This confirms that the environment variable is set correctly and can be used.
-      # You could replace this step with others, like deploying the model using the run_id.
-      - name: Use the Captured Run ID
+      - name: Get latest MLflow run_id
         run: |
-          echo "The captured MLflow run ID is: ${{ env.MLFLOW_RUN_ID }}"
-          echo "This ID can now be used for other tasks, like model registration or creating a deployment request."
+          RUN_ID=$(ls -td mlruns/0/*/ | head -n 1 | cut -d'/' -f3)
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Latest run_id: $RUN_ID"
 
