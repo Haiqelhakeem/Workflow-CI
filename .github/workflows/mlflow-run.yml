@@ -35,3 +35,10 @@ jobs:
             --n_hidden 2 \
             --n_units 64 \
             --dropout_rate 0.3
+      
+      - name: Get latest MLflow run_id
+        run: |
+          echo "Fetching latest MLflow run ID..."
+          cd MLProject
+          latest_run_id=$(ls -td mlruns/0/* | head -1 | xargs basename)
+          echo "Latest MLflow run ID: $latest_run_id"
