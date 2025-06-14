@@ -127,6 +127,11 @@ def main(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
     
     print("\nMLflow logging completed successfully.")
 
+    # --- 6. Output the Run ID for CI/CD ---
+    run_id = mlflow.active_run().info.run_id
+    print(f"MLFLOW_RUN_ID:{run_id}")
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a Deep Learning model for Churn Prediction with MLflow tracking.')
     parser.add_argument('--epochs', type=int, default=150, help='Number of training epochs.')
