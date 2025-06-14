@@ -1,0 +1,21 @@
+name: latihan-cs-mlflow
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      epochs: {type: int, default: 150}
+      batch_size: {type: int, default: 32}
+      learning_rate: {type: float, default: 0.001}
+      n_hidden: {type: int, default: 2}
+      n_units: {type: int, default: 64}
+      dropout_rate: {type: float, default: 0.3}
+    command: >
+      python modelling.py
+      --epochs {epochs}
+      --batch_size {batch_size}
+      --learning_rate {learning_rate}
+      --n_hidden {n_hidden}
+      --n_units {n_units}
+      --dropout_rate {dropout_rate}

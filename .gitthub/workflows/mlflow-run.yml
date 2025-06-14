@@ -1,0 +1,37 @@
+name: Run MLflow Model Training
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  train-model:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: 3.12
+          activate-environment: base
+
+      - name: Install MLflow
+        run: |
+          pip install mlflow
+
+      - name: Run MLflow project
+        run: |
+          cd MLProject
+          mlflow run . \
+            -P epochs=10 \
+            -P batch_size=32 \
+            -P learning_rate=0.001 \
+            -P n_hidden=2 \
+            -P n_units=64 \
+            -P dropout_rate=0.3
