@@ -56,7 +56,8 @@ def main(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
     
     # Start an MLflow run. All subsequent logging will be associated with this run.
     with mlflow.start_run() as run:
-        print(f"Starting MLflow Run: {run.info.run_id}")
+        run_id = run.info.run_id
+        print(f"Starting MLflow Run: {run_id}")
 
         # --- 1. Log Hyperparameters ---
         print("Logging parameters...")
@@ -124,6 +125,10 @@ def main(epochs, batch_size, learning_rate, n_hidden, n_units, dropout_rate):
             "keras-model", 
             registered_model_name="deep-churn-predictor"
         )
+
+        if os.getenv('GITHUB_ACTIONS'):
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                f.write(f"mlflow_run_id={run_id}\n")
 
         print("\nMLflow Run completed successfully.")
         print(f"To see your run, type 'mlflow ui' in your terminal and open the MLflow UI.")

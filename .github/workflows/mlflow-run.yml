@@ -36,9 +36,7 @@ jobs:
             --n_units 64 \
             --dropout_rate 0.3
 
-      - name: Get latest MLflow run_id
+      - name: Get MLflow Run ID
         run: |
-          RUN_ID=$(ls -td mlruns/0/*/ | head -n 1 | cut -d'/' -f3)
-          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-          echo "Latest run_id: $RUN_ID"
+          echo "MLflow Run ID: ${{ steps.training.outputs.mlflow_run_id }}"
 
