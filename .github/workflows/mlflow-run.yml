@@ -1,4 +1,4 @@
-name: Train Deep Learning Model
+name: MLflow Deep Learning CI
 
 on:
   push:
@@ -22,10 +22,30 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r MLProject/requirements.txt || true
-          pip install mlflow tensorflow scikit-learn pandas
+          pip install -r MLProject/requirements.txt
+
+      - name: Start MLflow Tracking Server (Docker container)
+        run: |
+          docker run -d -p 5000:5000 \
+            -v ${{ github.workspace }}/MLProject/mlruns:/mlflow/mlruns \
+            --name mlflow-server \
+            ghcr.io/mlflow/mlflow:latest \
+            mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns
+
+      - name: Wait for MLflow server
+        run: |
+          for i in {1..30}; do
+            if curl --silent http://127.0.0.1:5000/health; then
+              echo "MLflow server is ready!"
+              break
+            fi
+            echo "Waiting for MLflow server..."
+            sleep 3
+          done
 
       - name: Run training script
+        env:
+          MLFLOW_TRACKING_URI: http://127.0.0.1:5000
         run: |
           cd MLProject
           python modelling.py \
@@ -36,8 +56,5 @@ jobs:
             --n_units 64 \
             --dropout_rate 0.3
 
-      - name: Get MLflow Run ID
-        run: |
-          run_id=$(echo "$mlflow_output" | grep "MLFLOW_RUN_ID:" | cut -d':' -f2)
-          echo "MLFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
-
+      - name: Stop MLflow server
+        run: docker stop mlflow-server
